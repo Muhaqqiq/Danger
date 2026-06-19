@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIDAYATUL QUR'AN TIMER - RECEIVER</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { width: 420px; background: white; padding: 30px; border-radius: 25px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+        .school-name { font-size: 20px; font-weight: bold; color: #006400; margin-bottom: 15px; }
+        .logo { width: 120px; height: 120px; object-fit: contain; display: block; margin: auto; margin-bottom: 25px; }
+        .top-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .stop-btn { width: 120px; height: 120px; border-radius: 50%; border: none; background: linear-gradient(#2ecc71,#0b8c38); color: white; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .timeup-btn { display: none; width: 120px; height: 120px; border-radius: 50%; border: none; background: gold; color: black; font-size: 20px; font-weight: bold; }
+        .danger-btn { width: 240px; height: 240px; border-radius: 50%; border: none; background: linear-gradient(#ff4d4d,#b30000); color: white; font-size: 42px; font-weight: bold; cursor: pointer; box-shadow: 0 12px 25px rgba(0,0,0,.5), inset 0 5px 10px rgba(255,255,255,.4); }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+        .blink { animation: blink 1s infinite; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="school-name">HIDAYATUL QUR'AN LITAHFIZ JALINGO</div>
+    <img src="logo.png" class="logo">
+
+    <div class="top-buttons">
+        <button id="stopBtn" class="stop-btn">STOP</button>
+        <button id="timeUpBtn" class="timeup-btn">TIME UP</button>
+    </div>
+
+    <button class="danger-btn">DANGER</button>
+    <audio id="dangerSound" src="danger.mp3"></audio>
+    <audio id="hasbukSound" src="hasbuk.mp3"></audio>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyD-EKc2oZ3rsMgd7frfyBXLz5an0-8PR24",
+        authDomain: "hidayatul-qur-an-timer.firebaseapp.com",
+        projectId: "hidayatul-qur-an-timer",
+        storageBucket: "hidayatul-qur-an-timer.firebasestorage.app",
+        messagingSenderId: "1093743817839",
+        appId: "1:1093743817839:web:8b39b8adbc485e8773499a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const stopBtn = document.getElementById("stopBtn");
+    const timeUpBtn = document.getElementById("timeUpBtn");
+    const dangerBtn = document.querySelector(".danger-btn");
+    const dangerSound = document.getElementById("dangerSound");
+    const hasbukSound = document.getElementById("hasbukSound");
+
+    let pageLoadTime = Date.now();
+    let vibrationInterval = null; // Wurin rike tsarin vibration na continuous loop
+
+    function startContinuousVibration() {
+        if (vibrationInterval) clearInterval(vibrationInterval);
+
+        // Kunna vibration na farko kai tsaye
+        if (navigator.vibrate) {
+            navigator.vibrate([1000, 500, 1000, 500]);
+        }
+
+        // Sanya shi ya rinka kiran kansa kowane bayan sakan 3 (babu adadi)
+        vibrationInterval = setInterval(() => {
+            if (navigator.vibrate) {
+                navigator.vibrate([1000, 500, 1000, 500]);
+            }
+        }, 3000);
+    }
+
+    function stopContinuousVibration() {
+        // Dakatar da madaukin vibration (loop)
+        if (vibrationInterval) {
+            clearInterval(vibrationInterval);
+            vibrationInterval = null;
+        }
+        // Kashe vibration din da yake tsaka da yi a daidai lokacin
+        if (navigator.vibrate) {
+            navigator.vibrate(0);
+        }
+    }
+
+    function showTimeUp() {
+        timeUpBtn.style.display = "block";
+        timeUpBtn.classList.add("blink");
+        startContinuousVibration(); // Fara vibration mara iyaka
+    }
+
+    function hideTimeUp() {
+        timeUpBtn.style.display = "none";
+        timeUpBtn.classList.remove("blink");
+        stopContinuousVibration(); // Dakatar da vibration gaba daya
+    }
+
+    onSnapshot(doc(db, "alerts", "timeup"), (snapshot) => {
+        const data = snapshot.data();
+        if (!data) return;
+
+        if (data.message === "TIME_UP" && data.time > pageLoadTime) {
+            showTimeUp();
+        } else if (data.message === "RESET") {
+            hideTimeUp();
+        }
+    });
+
+    // Idan an danna maballin kore (STOP)
+    stopBtn.addEventListener("click", () => {
+        // 1. Kunna sautin Hasbuk
+        hasbukSound.currentTime = 0;
+        hasbukSound.play().catch((e) => console.log("Sautin hasbuk ya kasa tashi: ", e));
+
+        // 2. Dakatar da vibration da ɓoye maballin TIME UP (Refresh na kansa)
+        hideTimeUp();
+    });
+
+    dangerBtn.addEventListener("click", () => {
+        dangerSound.currentTime = 0;
+        dangerSound.play().catch((e) => console.log("Sauti ya kasa tashi: ", e));
+    });
+</script>
+</body>
+</html>
