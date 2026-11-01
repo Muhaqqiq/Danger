@@ -35,95 +35,120 @@
 </div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+    
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import {
+    getFirestore,
+    doc,
+    onSnapshot,
+    setDoc
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyD-EKc2oZ3rsMgd7frfyBXLz5an0-8PR24",
-        authDomain: "hidayatul-qur-an-timer.firebaseapp.com",
-        projectId: "hidayatul-qur-an-timer",
-        storageBucket: "hidayatul-qur-an-timer.firebasestorage.app",
-        messagingSenderId: "1093743817839",
-        appId: "1:1093743817839:web:8b39b8adbc485e8773499a"
-    };
+const firebaseConfig = {
+    apiKey: "AIzaSyD-EK2c oZ3rsMgd7frfyBXLz5an0-8PR24".replace(" ", ""),
+    authDomain: "hidayatul-qur-an-timer.firebaseapp.com",
+    projectId: "hidayatul-qur-an-timer",
+    storageBucket: "hidayatul-qur-an-timer.firebasestorage.app",
+    messagingSenderId: "1093743817839",
+    appId: "1:1093743817839:web:8b39b8adbc485e8773499a"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const alertRef = doc(db, "alerts", "timeup");
 
-    const stopBtn = document.getElementById("stopBtn");
-    const timeUpBtn = document.getElementById("timeUpBtn");
-    const dangerBtn = document.querySelector(".danger-btn");
-    const dangerSound = document.getElementById("dangerSound");
-    const hasbukSound = document.getElementById("hasbukSound");
+const stopBtn = document.getElementById("stopBtn");
+const timeUpBtn = document.getElementById("timeUpBtn");
+const dangerBtn = document.querySelector(".danger-btn");
 
-    let pageLoadTime = Date.now();
-    let vibrationInterval = null; // Wurin rike tsarin vibration na continuous loop
+const dangerSound = document.getElementById("dangerSound");
+const hasbukSound = document.getElementById("hasbukSound");
 
-    function startContinuousVibration() {
-        if (vibrationInterval) clearInterval(vibrationInterval);
+let vibrationInterval = null;
 
-        // Kunna vibration na farko kai tsaye
-        if (navigator.vibrate) {
-            navigator.vibrate([1000, 500, 1000, 500]);
-        }
+function startContinuousVibration() {
+    stopContinuousVibration();
 
-        // Sanya shi ya rinka kiran kansa kowane bayan sakan 3 (babu adadi)
+    if (navigator.vibrate) {
+        navigator.vibrate([1000, 500, 1000, 500]);
+
         vibrationInterval = setInterval(() => {
-            if (navigator.vibrate) {
-                navigator.vibrate([1000, 500, 1000, 500]);
-            }
+            navigator.vibrate([1000, 500, 1000, 500]);
         }, 3000);
     }
+}
 
-    function stopContinuousVibration() {
-        // Dakatar da madaukin vibration (loop)
-        if (vibrationInterval) {
-            clearInterval(vibrationInterval);
-            vibrationInterval = null;
-        }
-        // Kashe vibration din da yake tsaka da yi a daidai lokacin
-        if (navigator.vibrate) {
-            navigator.vibrate(0);
-        }
+function stopContinuousVibration() {
+    if (vibrationInterval !== null) {
+        clearInterval(vibrationInterval);
+        vibrationInterval = null;
     }
 
-    function showTimeUp() {
-        timeUpBtn.style.display = "block";
-        timeUpBtn.classList.add("blink");
-        startContinuousVibration(); // Fara vibration mara iyaka
+    if (navigator.vibrate) {
+        navigator.vibrate(0);
     }
+}
 
-    function hideTimeUp() {
-        timeUpBtn.style.display = "none";
-        timeUpBtn.classList.remove("blink");
-        stopContinuousVibration(); // Dakatar da vibration gaba daya
-    }
+function showTimeUp() {
+    timeUpBtn.style.display = "block";
+    timeUpBtn.classList.add("blink");
+    startContinuousVibration();
+}
 
-    onSnapshot(doc(db, "alerts", "timeup"), (snapshot) => {
+function hideTimeUp() {
+    timeUpBtn.style.display = "none";
+    timeUpBtn.classList.remove("blink");
+    stopContinuousVibration();
+}
+
+// Real-time Firebase communication
+onSnapshot(
+    alertRef,
+    (snapshot) => {
+        if (!snapshot.exists()) return;
+
         const data = snapshot.data();
-        if (!data) return;
 
-        if (data.message === "TIME_UP" && data.time > pageLoadTime) {
+        if (data.message === "TIME_UP") {
             showTimeUp();
-        } else if (data.message === "RESET") {
+        }
+
+        if (data.message === "RESET" ||
+            data.message === "RUNNING") {
             hideTimeUp();
         }
-    });
+    },
+    (error) => {
+        console.error("Receiver Firebase error:", error);
+        alert("Firebase connection error. Check your internet connection.");
+    }
+);
 
-    // Idan an danna maballin kore (STOP)
-    stopBtn.addEventListener("click", () => {
-        // 1. Kunna sautin Hasbuk
-        hasbukSound.currentTime = 0;
-        hasbukSound.play().catch((e) => console.log("Sautin hasbuk ya kasa tashi: ", e));
+// STOP: Send RESET to Firebase
+stopBtn.addEventListener("click", async () => {
+    try {
+        await setDoc(alertRef, {
+            message: "RESET",
+            time: Date.now()
+        });
 
-        // 2. Dakatar da vibration da ɓoye maballin TIME UP (Refresh na kansa)
         hideTimeUp();
-    });
 
-    dangerBtn.addEventListener("click", () => {
-        dangerSound.currentTime = 0;
-        dangerSound.play().catch((e) => console.log("Sauti ya kasa tashi: ", e));
-    });
+        hasbukSound.currentTime = 0;
+        hasbukSound.play().catch(console.error);
+
+    } catch (error) {
+        console.error("RESET error:", error);
+        alert("An kasa aika RESET. Duba internet.");
+    }
+});
+
+// DANGER sound (local Receiver button)
+dangerBtn.addEventListener("click", () => {
+    dangerSound.currentTime = 0;
+    dangerSound.play().catch(console.error);
+});
+    
 </script>
 </body>
 </html>
